@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Snakeinhtml</title>
+  <style>
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: black;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    border: 1px solid white;
+  }
+  </style>
+</head>
+<body>
+<canvas width="400" height="400" id="game"></canvas>
+<input type="text" id="playerName" placeholder="Enter your name" style="position: absolute; top: 10px; right: 10px;">
+<button id="devButton" style="position: absolute; top: 50px; right: 10px;">Dev</button>
+<script>
+var canvas = document.getElementById('game');
+var context = canvas.getContext('2d');
+
+var grid = 16;
+var count = 0;
+var score = 0;
+var level = 1;
+var obstacleFrequency = 100;
+var obstacles = [];
+var gameOver = false;
+var speed = 10;
+var paused = false;
+
+var snake = {
+  x: 160,
+  y: 160,
+
+  dx: grid,
+  dy: 0,
+
+  cells: [],
+
+  maxCells: 4
+};
+var apple = {
+  x: 320,
+  y: 320
+};
+var luckyBlock = {
+  x: 0,
+  y: 0,
+  active: false
+};
+
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min)) + min;
+}
+
+function loop() {
+  if (gameOver) {
+    return;
+  }
+
+  if (!paused) {
+    requestAnimationFrame(loop);
+
+    if (++count < speed) {
+      return;
+    }
+
+    count = 0;
+    context.clearRect(0,0,canvas.width,canvas.height);
+
+    snake.x += snake.dx;
+    snake.y += snake.dy;
+
+    if (snake.x < 0 || snake.x >= canvas.width || snake.y < 0 || snake.y >= canvas.height) {
+      gameOver = true;
+    }
+
+    snake.cells.unshift({x: snake.x, y: snake.y});
+
+    if (snake.cells.length > snake.maxCells) {
+      snake.cells.pop();
+    }
+
+    context.fillStyle = 'red';
+    context.fillRect(apple.x, apple.y, grid-1, grid-1);
+
+    if (luckyBlock.active) {
+      context.fillStyle = 'gold';
+      context.fillRect(luckyBlock.x, luckyBlock.y, grid-1, grid-1);
+    }
+
+    context.fillStyle = 'green';
+    snake.cells.forEach(function(cell, index) {
+      context.fillRect(cell.x, cell.y, grid-1, grid-1);
+
+      if (cell.x === apple.x && cell.y === apple.y) {
+        snake.maxCells++;
+        score++;
+        apple.x = getRandomInt(0, 25) * grid;
+        apple.y = getRandomInt(0, 25) * grid;
+
+        if (score % 100 === 0) {
+          level++;
+          generateObstacles();
+        }
+
+        if (score >= 100 && !luckyBlock.active) {
+          luckyBlock.x = getRandomInt(0, 25) * grid;
+          luckyBlock.y = getRandomInt(0, 25) * grid;
+          luckyBlock.active = true;
+        }
+      }
+
+      if (cell.x === luckyBlock.x && cell.y === luckyBlock.y) {
+        snake.maxCells += 2;
+        score += 2;
+        luckyBlock.x = getRandomInt(0, 25) * grid;
+        luckyBlock.y = getRandomInt(0, 25) * grid;
+      }
+
+      for (var i = index + 1; i < snake.cells.length; i++) {
+        if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
+          gameOver = true;
+          break;
+        }
+      }
+    });
+
+    context.fillStyle = 'white';
+    context.font = '20px Arial';
+    context.fillText('Score: ' + score, 10, 25);
+    context.fillText('Level: ' + level, 10, 50);
+
+    obstacles.forEach(function (obstacle) {
+      context.fillStyle = 'blue';
+      context.fillRect(obstacle.x, obstacle.y, grid-1, grid-1);
+
+      if (snake.x === obstacle.x && snake.y === obstacle.y) {
+        gameOver = true;
+      }
+    });
+  }
+}
+
+function generateObstacles() {
+  obstacles = [];
+
+  for (var i = 0; i < level; i++) {
+    var obstacleX = getRandomInt(0, 25) * grid;
+    var obstacleY = getRandomInt(0, 25) * grid;
+
+    if (obstacleX !== apple.x && obstacleY !== apple.y && obstacleX !== luckyBlock.x && obstacleY !== luckyBlock.y) {
+      obstacles.push({ x: obstacleX, y: obstacleY });
+    }
+  }
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.which === 37 && snake.dx === 0) {
+    snake.dx = -grid;
+    snake.dy = 0;
+  }
+  else if (e.which === 38 && snake.dy === 0) {
+    snake.dy = -grid;
+    snake.dx = 0;
+  }
+  else if (e.which === 39 && snake.dx === 0) {
+    snake.dx = grid;
+    snake.dy = 0;
+  }
+  else if (e.which === 40 && snake.dy === 0) {
+    snake.dy = grid;
+    snake.dx = 0;
+  }
+  else if (e.which === 69) { // "e" key for pausing/resuming
+    paused = !paused;
+    if (!gameOver && !paused) {
+      loop();
+    }
+  }
+  else if (e.which === 82 && score >= 2) { // "r" key for removing a segment
+    snake.cells.pop();
+    snake.maxCells--;
+    score -= 2;
+    if (score < 0) {
+      score = 0;
+    }
+  }
+});
+
+document.getElementById('devButton').addEventListener('click', function() {
+  var action = prompt('Enter an action (add/remove/lucky/obstacle):');
+  if (action === 'add') {
+    var points = parseInt(prompt('Enter the number of points to add:'));
+    if (!isNaN(points)) {
+      score += points;
+    }
+  } else if (action === 'remove') {
+    var points = parseInt(prompt('Enter the number of points to remove:'));
+    if (!isNaN(points)) {
+      score = Math.max(score - points, 0);
+    }
+  } else if (action === 'lucky') {
+    luckyBlock.x = getRandomInt(0, 25) * grid;
+    luckyBlock.y = getRandomInt(0, 25) * grid;
+    luckyBlock.active = true;
+  } else if (action === 'obstacle') {
+    var obstacleX = getRandomInt(0, 25) * grid;
+    var obstacleY = getRandomInt(0, 25) * grid;
+    obstacles.push({ x: obstacleX, y: obstacleY });
+  }
+});
+
+generateObstacles();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
